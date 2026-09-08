@@ -1,4 +1,4 @@
-## PacMan likev2
+## PacMan likev3
 
 Vamos a crear un juego de PacMan como el juego de PacMan original, pero con una interfaz gráfica más moderna y sencilla.
 
