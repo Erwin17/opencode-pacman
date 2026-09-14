@@ -42,6 +42,7 @@ function createGame() {
       dir: 'up',
       speed: GHOST_SPEED,
       kind: g.kind,
+      home: g.home,
     } ) ),
   };
 }
@@ -110,35 +111,77 @@ function movePacman( game ) {
   wrapTunnel( p, width );
 }
 
+const PINKY_AHEAD = 4;
+const INKY_AHEAD = 2;
+const CLYDE_CHASE_RANGE = 8;
+
+function clampToGrid( x, y, grid ) {
+  const maxX = grid[ 0 ].length - 1;
+  const maxY = grid.length - 1;
+  return {
+    x: Math.max( 0, Math.min( maxX, Math.round( x ) ) ),
+    y: Math.max( 0, Math.min( maxY, Math.round( y ) ) ),
+  };
+}
+
+function targetFor( game, g ) {
+  const p = game.pacman;
+  const px = Math.round( p.x );
+  const py = Math.round( p.y );
+  const grid = game.grid;
+
+  switch ( g.kind ) {
+    case 'blinky':
+      return { tx: px, ty: py };
+
+    case 'pinky': {
+      const d = DIRS[ p.dir ];
+      return clampToGrid( px + d.x * PINKY_AHEAD, py + d.y * PINKY_AHEAD, grid );
+    }
+
+    case 'inky': {
+      const blinky = game.ghosts.find( ( gh ) => gh.kind === 'blinky' );
+      const bx = blinky ? Math.round( blinky.x ) : px;
+      const by = blinky ? Math.round( blinky.y ) : py;
+      const d = DIRS[ p.dir ];
+      const ax = px + d.x * INKY_AHEAD;
+      const ay = py + d.y * INKY_AHEAD;
+      return clampToGrid( 2 * ax - bx, 2 * ay - by, grid );
+    }
+
+    case 'clyde': {
+      const dist = Math.abs( g.x - px ) + Math.abs( g.y - py );
+      if ( dist > CLYDE_CHASE_RANGE ) return { tx: px, ty: py };
+      return g.home;
+    }
+
+    default:
+      return { tx: px, ty: py };
+  }
+}
+
 function decideGhost( game, g ) {
   const grid = game.grid;
-  const p = game.pacman;
 
   const options = Object.keys( DIRS ).filter(
     ( dir ) => dir !== OPPOSITE[ g.dir ] && canMove( grid, g.x, g.y, dir, 'ghost' )
   );
-  // Sin salida (callejon): permitir el giro de 180.
-  const choices = options.length ? options : [ '' + OPPOSITE[ g.dir ] ];
+  const choices = options.length ? options : [ OPPOSITE[ g.dir ] ];
 
-  if ( g.kind === 'hunter' ) {
-    const px = Math.round( p.x );
-    const py = Math.round( p.y );
-    let best = choices[ 0 ];
-    let bestDist = Infinity;
-    for ( const dir of choices ) {
-      const d = DIRS[ dir ];
-      const nx = g.x + d.x;
-      const ny = g.y + d.y;
-      const dist = Math.abs( nx - px ) + Math.abs( ny - py );
-      if ( dist < bestDist ) {
-        bestDist = dist;
-        best = dir;
-      }
+  const { tx, ty } = targetFor( game, g );
+  let best = choices[ 0 ];
+  let bestDist = Infinity;
+  for ( const dir of choices ) {
+    const d = DIRS[ dir ];
+    const nx = g.x + d.x;
+    const ny = g.y + d.y;
+    const dist = Math.abs( nx - tx ) + Math.abs( ny - ty );
+    if ( dist < bestDist ) {
+      bestDist = dist;
+      best = dir;
     }
-    g.dir = best;
-  } else {
-    g.dir = choices[ Math.floor( Math.random() * choices.length ) ];
   }
+  g.dir = best;
 }
 
 function moveGhost( game, g ) {
